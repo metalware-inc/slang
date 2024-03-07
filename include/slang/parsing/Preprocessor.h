@@ -59,6 +59,8 @@ struct SLANG_EXPORT PreprocessorOptions {
     flat_hash_set<std::string_view> ignoreDirectives;
 };
 
+static Diagnostics unusedDiags;
+
 /// Preprocessor - Interface between lexer and parser
 ///
 /// This class handles the messy interface between various source file lexers, include directives,
@@ -68,7 +70,9 @@ class SLANG_EXPORT Preprocessor {
 public:
     Preprocessor(SourceManager& sourceManager, BumpAllocator& alloc, Diagnostics& diagnostics,
                  const Bag& options = {},
-                 std::span<const syntax::DefineDirectiveSyntax* const> inheritedMacros = {});
+                 std::span<const syntax::DefineDirectiveSyntax* const> inheritedMacros = {},
+                 Diagnostics& lineSuppressedDiagnostics = unusedDiags,
+                 Diagnostics& fileSuppressedDiagnostics = unusedDiags);
 
     /// Gets the next token in the stream, after applying preprocessor rules.
     Token next();
@@ -373,6 +377,8 @@ private:
     SourceManager& sourceManager;
     BumpAllocator& alloc;
     Diagnostics& diagnostics;
+    Diagnostics& lineSuppressedDiagnostics;
+    Diagnostics& fileSuppressedDiagnostics;
     PreprocessorOptions options;
     LexerOptions lexerOptions;
 

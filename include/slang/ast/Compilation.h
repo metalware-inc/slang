@@ -302,6 +302,11 @@ public:
 
     /// Gets the diagnostics produced during lexing, preprocessing, and syntax parsing.
     const Diagnostics& getParseDiagnostics();
+    ///
+    /// Gets the line-wide suppressed diagnostics produced during lexing, preprocessing, and syntax parsing.
+    const Diagnostics& getLineSuppressedDiagnostics();
+    /// Gets the file-wide suppressed diagnostics produced during lexing, preprocessing, and syntax parsing.
+    const Diagnostics& getFileSuppressedDiagnostics();
 
     /// Gets the diagnostics produced during semantic analysis, including the creation of
     /// symbols, type checking, and name lookup. Note that this will finalize the compilation,
@@ -891,6 +896,8 @@ private:
     Diagnostic tempDiag;
 
     std::optional<Diagnostics> cachedParseDiagnostics;
+    std::optional<Diagnostics> cachedLineSuppressedDiagnostics;
+    std::optional<Diagnostics> cachedFileSuppressedDiagnostics;
     std::optional<Diagnostics> cachedSemanticDiagnostics;
     std::optional<Diagnostics> cachedAllDiagnostics;
 

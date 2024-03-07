@@ -24,11 +24,11 @@ using LF = LexerFacts;
 
 Preprocessor::Preprocessor(SourceManager& sourceManager, BumpAllocator& alloc,
                            Diagnostics& diagnostics, const Bag& options_,
-                           std::span<const DefineDirectiveSyntax* const> inheritedMacros) :
-    sourceManager(sourceManager), alloc(alloc), diagnostics(diagnostics),
-    options(options_.getOrDefault<PreprocessorOptions>()),
-    lexerOptions(options_.getOrDefault<LexerOptions>()),
-    numberParser(diagnostics, alloc, options.languageVersion) {
+                           std::span<const DefineDirectiveSyntax* const> inheritedMacros,
+                           Diagnostics& lineSuppressedDiagnostics, Diagnostics& fileSuppressedDiagnostics) :
+    sourceManager(sourceManager),
+    alloc(alloc), diagnostics(diagnostics), options(options_.getOrDefault<PreprocessorOptions>()),
+    lexerOptions(options_.getOrDefault<LexerOptions>()), numberParser(diagnostics, alloc, options.languageVersion), lineSuppressedDiagnostics(lineSuppressedDiagnostics), fileSuppressedDiagnostics(fileSuppressedDiagnostics) {
 
     keywordVersionStack.push_back(LF::getDefaultKeywordVersion(options.languageVersion));
     resetAllDirectives();
@@ -81,8 +81,8 @@ Preprocessor::Preprocessor(SourceManager& sourceManager, BumpAllocator& alloc,
 
 Preprocessor::Preprocessor(const Preprocessor& other) :
     sourceManager(other.sourceManager), alloc(other.alloc), diagnostics(other.diagnostics),
-    options(other.options), lexerOptions(other.lexerOptions),
-    numberParser(diagnostics, alloc, options.languageVersion) {
+    numberParser(diagnostics, alloc, options.languageVersion), lineSuppressedDiagnostics(other.lineSuppressedDiagnostics),
+    fileSuppressedDiagnostics(other.fileSuppressedDiagnostics) {
 
     keywordVersionStack.push_back(LF::getDefaultKeywordVersion(options.languageVersion));
 }
@@ -98,7 +98,8 @@ void Preprocessor::pushSource(std::string_view source, std::string_view name) {
 void Preprocessor::pushSource(SourceBuffer buffer) {
     SLANG_ASSERT(buffer.id);
 
-    lexerStack.emplace_back(std::make_unique<Lexer>(buffer, alloc, diagnostics, lexerOptions));
+    lexerStack.emplace_back(std::make_unique<Lexer>(buffer, alloc, diagnostics, lexerOptions,
+          lineSuppressedDiagnostics, fileSuppressedDiagnostics));
 }
 
 void Preprocessor::popSource() {
