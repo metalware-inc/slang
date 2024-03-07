@@ -30,16 +30,20 @@ using namespace syntax;
 using LF = LexerFacts;
 
 Lexer::Lexer(SourceBuffer buffer, BumpAllocator& alloc, Diagnostics& diagnostics,
-             LexerOptions options) :
-    Lexer(buffer.id, buffer.data, buffer.data.data(), alloc, diagnostics, options) {
+             LexerOptions options, Diagnostics& lineSuppressedDiagnostics, Diagnostics& fileSuppressedDiagnostics):
+    Lexer(buffer.id, buffer.data, buffer.data.data(), alloc, diagnostics, options, lineSuppressedDiagnostics,
+        fileSuppressedDiagnostics) {
     library = buffer.library;
 }
 
 Lexer::Lexer(BufferID bufferId, std::string_view source, const char* startPtr, BumpAllocator& alloc,
-             Diagnostics& diagnostics, LexerOptions options) :
-    alloc(alloc), diagnostics(diagnostics), options(options), bufferId(bufferId),
-    originalBegin(source.data()), sourceBuffer(startPtr),
-    sourceEnd(source.data() + source.length()), marker(nullptr) {
+             Diagnostics& diagnostics, LexerOptions options, Diagnostics& lineSuppressedDiagnostics, 
+             Diagnostics& fileSuppressedDiagnostics):
+    alloc(alloc),
+    diagnostics(diagnostics), options(options), bufferId(bufferId), originalBegin(source.data()),
+    sourceBuffer(startPtr), sourceEnd(source.data() + source.length()), marker(nullptr),
+    lineSuppressedDiagnostics(lineSuppressedDiagnostics),
+    fileSuppressedDiagnostics (fileSuppressedDiagnostics) {
     ptrdiff_t count = sourceEnd - sourceBuffer;
     SLANG_ASSERT(count);
     SLANG_ASSERT(sourceEnd[-1] == '\0');
@@ -1202,8 +1206,23 @@ void Lexer::scanWhitespace() {
     addTrivia(TriviaKind::Whitespace);
 }
 
+enum SuppressIdentifierType {
+    LINE_SUPPRESS,
+    FILE_SUPPRESS
+};
+
 void Lexer::scanLineComment() {
     bool sawUTF8Error = false;
+    const std::string lineSuppressIdentifier = "@suppress";
+    const std::string fileSuppressIdentifier = "@file_suppress";
+
+    std::optional<SuppressIdentifierType> suppressType;
+
+    std::vector<std::string> suppressedDiagStrings;
+
+    std::string runningSuppressDiagBuf;
+    std::string runningSuppressIdentifierBuf;
+
     while (true) {
         char c = peek();
         if (isASCII(c)) {
@@ -1219,12 +1238,52 @@ void Lexer::scanLineComment() {
                 errorCount++;
                 addDiag(diag::EmbeddedNull, currentOffset());
             }
+
+            if (suppressType.has_value()) {
+              if(!isWhitespace(c) && c != '(' && c != ')' && c != ',') {
+                runningSuppressDiagBuf += c;
+              } else if (c == ',' || c == ')') {
+                suppressedDiagStrings.push_back(runningSuppressDiagBuf);
+                runningSuppressDiagBuf.clear();
+              }
+            }
+
+            // Check if adding c forms a substring of the suppress identifier
+            bool possibly_valid = false;
+            for (const auto& suppressIdentifier : {lineSuppressIdentifier, fileSuppressIdentifier}) {
+                if (!suppressType.has_value() && suppressIdentifier.substr(0, std::min(runningSuppressIdentifierBuf.size() + 1, suppressIdentifier.size())) == runningSuppressIdentifierBuf + c) {
+                    runningSuppressIdentifierBuf += c;
+                    possibly_valid = true;
+                    if (runningSuppressIdentifierBuf == lineSuppressIdentifier) {
+                        suppressType = LINE_SUPPRESS;
+                    } else if (runningSuppressIdentifierBuf == fileSuppressIdentifier) {
+                        suppressType = FILE_SUPPRESS;
+                    }
+                    break;
+                }
+            }
+
+            if (!possibly_valid) {
+                runningSuppressIdentifierBuf.clear();
+            }
             advance();
         }
         else {
             sawUTF8Error |= !scanUTF8Char(sawUTF8Error);
         }
     }
+
+    for (const auto& s : suppressedDiagStrings) {
+        std::vector<DiagCode> hits = fromString(s);
+
+        if (hits.size() > 0) {
+          if (suppressType == LINE_SUPPRESS)
+            addLineSuppressedDiag(hits[0], currentOffset());
+          else if (suppressType == FILE_SUPPRESS)
+            addFileSuppressedDiag(hits[0], currentOffset());
+        }
+    }
+
     addTrivia(TriviaKind::LineComment);
 }
 
@@ -1477,6 +1536,14 @@ void Lexer::addTrivia(TriviaKind kind) {
 
 Diagnostic& Lexer::addDiag(DiagCode code, size_t offset) {
     return diagnostics.add(code, SourceLocation(bufferId, offset));
+}
+
+Diagnostic& Lexer::addLineSuppressedDiag(DiagCode code, size_t offset) {
+    return lineSuppressedDiagnostics.add(code, SourceLocation(bufferId, offset));
+}
+
+Diagnostic& Lexer::addFileSuppressedDiag(DiagCode code, size_t offset) {
+    return fileSuppressedDiagnostics.add(code, SourceLocation(bufferId, offset));
 }
 
 size_t Lexer::currentOffset() const {
