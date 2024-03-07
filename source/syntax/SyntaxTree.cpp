@@ -34,8 +34,8 @@ SyntaxTree::TreeOrError SyntaxTree::fromFile(std::string_view path) {
 }
 
 SyntaxTree::TreeOrError SyntaxTree::fromFile(std::string_view path, SourceManager& sourceManager,
-                                             const Bag& options) {
-    auto buffer = sourceManager.readSource(path, /* library */ nullptr);
+                                             const Bag& options, const SourceLibrary* lib) {
+    auto buffer = sourceManager.readSource(path, /* library */ lib);
     if (!buffer)
         return nonstd::make_unexpected(std::pair{buffer.error(), path});
     return create(sourceManager, std::span(&buffer.value(), 1), options, {}, false);
@@ -46,10 +46,11 @@ SyntaxTree::TreeOrError SyntaxTree::fromFiles(std::span<const std::string_view> 
 }
 
 SyntaxTree::TreeOrError SyntaxTree::fromFiles(std::span<const std::string_view> paths,
-                                              SourceManager& sourceManager, const Bag& options) {
+                                              SourceManager& sourceManager, const Bag& options,
+                                              const SourceLibrary* lib) {
     SmallVector<SourceBuffer, 4> buffers(paths.size(), UninitializedTag());
     for (auto path : paths) {
-        auto buffer = sourceManager.readSource(path, /* library */ nullptr);
+        auto buffer = sourceManager.readSource(path, /* library */ lib);
         if (!buffer)
             return nonstd::make_unexpected(std::pair{buffer.error(), path});
 
@@ -112,11 +113,14 @@ SourceManager& SyntaxTree::getDefaultSourceManager() {
 
 SyntaxTree::SyntaxTree(SyntaxNode* root, const SourceLibrary* library, SourceManager& sourceManager,
                        BumpAllocator&& alloc, Diagnostics&& diagnostics, ParserMetadata&& metadata,
-                       std::vector<const DefineDirectiveSyntax*>&& macros, Bag options) :
+                       std::vector<const DefineDirectiveSyntax*>&& macros, Bag options,
+                       Diagnostics&& lineSuppressedDiagnostics, Diagnostics&& fileSuppressedDiagnostics) :
     rootNode(root),
     library(library), sourceMan(sourceManager), alloc(std::move(alloc)),
     diagnosticsBuffer(std::move(diagnostics)), options_(std::move(options)),
-    metadata(std::make_unique<ParserMetadata>(std::move(metadata))), macros(std::move(macros)) {
+    metadata(std::make_unique<ParserMetadata>(std::move(metadata))), macros(std::move(macros)),
+    lineSuppressedDiagnosticsBuffer(std::move(lineSuppressedDiagnostics)),
+    fileSuppressedDiagnosticsBuffer(std::move(fileSuppressedDiagnostics)) {
 }
 
 std::shared_ptr<SyntaxTree> SyntaxTree::create(SourceManager& sourceManager,
@@ -135,7 +139,11 @@ std::shared_ptr<SyntaxTree> SyntaxTree::create(SourceManager& sourceManager,
 
     BumpAllocator alloc;
     Diagnostics diagnostics;
-    Preprocessor preprocessor(sourceManager, alloc, diagnostics, options, inheritedMacros);
+    Diagnostics lineSuppressedDiagnostics;
+    Diagnostics fileSuppressedDiagnostics;
+
+    Preprocessor preprocessor(sourceManager, alloc, diagnostics, options, inheritedMacros,
+        lineSuppressedDiagnostics, fileSuppressedDiagnostics);
 
     const SourceLibrary* library = nullptr;
     for (auto it = sources.rbegin(); it != sources.rend(); it++) {
@@ -162,7 +170,8 @@ std::shared_ptr<SyntaxTree> SyntaxTree::create(SourceManager& sourceManager,
 
     return std::shared_ptr<SyntaxTree>(
         new SyntaxTree(root, library, sourceManager, std::move(alloc), std::move(diagnostics),
-                       parser.getMetadata(), preprocessor.getDefinedMacros(), options));
+                       parser.getMetadata(), preprocessor.getDefinedMacros(), options,
+                       std::move(lineSuppressedDiagnostics), std::move(fileSuppressedDiagnostics)));
 }
 
 std::shared_ptr<SyntaxTree> SyntaxTree::fromLibraryMapFile(std::string_view path,

@@ -1,6 +1,5 @@
 //------------------------------------------------------------------------------
-//! @file Lexer.h
-//! @brief Source file lexer
+//! @file Lexer.h //! @brief Source file lexer
 //
 // SPDX-FileCopyrightText: Michael Popoloski
 // SPDX-License-Identifier: MIT
@@ -32,6 +31,8 @@ struct SLANG_EXPORT LexerOptions {
 /// Possible encodings for encrypted text used in a pragma protect region.
 enum class SLANG_EXPORT ProtectEncoding { UUEncode, Base64, QuotedPrintable, Raw };
 
+static Diagnostics unusedDiag = Diagnostics();
+
 /// The Lexer is responsible for taking source text and chopping it up into tokens.
 /// Tokens carry along leading "trivia", which is things like whitespace and comments,
 /// so that we can programmatically piece back together what the original file looked like.
@@ -41,7 +42,8 @@ enum class SLANG_EXPORT ProtectEncoding { UUEncode, Base64, QuotedPrintable, Raw
 class SLANG_EXPORT Lexer {
 public:
     Lexer(SourceBuffer buffer, BumpAllocator& alloc, Diagnostics& diagnostics,
-          LexerOptions options = LexerOptions{});
+          LexerOptions options = LexerOptions{}, Diagnostics& lineSuppressedDiagnostics = unusedDiag,
+          Diagnostics& fileSuppressedDiagnostics = unusedDiag);
 
     // Not copyable
     Lexer(const Lexer&) = delete;
@@ -83,7 +85,8 @@ public:
 
 private:
     Lexer(BufferID bufferId, std::string_view source, const char* startPtr, BumpAllocator& alloc,
-          Diagnostics& diagnostics, LexerOptions options);
+          Diagnostics& diagnostics, LexerOptions options, Diagnostics& lineSuppressedDiagnostics = unusedDiag,
+          Diagnostics& fileSuppressedDiagnostics = unusedDiag);
 
     Token lexToken(KeywordVersion keywordVersion);
     Token lexEscapeSequence(bool isMacroName);
@@ -110,6 +113,8 @@ private:
 
     void addTrivia(TriviaKind kind);
     Diagnostic& addDiag(DiagCode code, size_t offset);
+    Diagnostic& addLineSuppressedDiag(DiagCode code, size_t offset);
+    Diagnostic& addFileSuppressedDiag(DiagCode code, size_t offset);
 
     // source pointer manipulation
     void mark() { marker = sourceBuffer; }
@@ -136,6 +141,9 @@ private:
 
     BumpAllocator& alloc;
     Diagnostics& diagnostics;
+    Diagnostics& lineSuppressedDiagnostics;
+    Diagnostics& fileSuppressedDiagnostics;
+
     LexerOptions options;
 
     // the source text and start and end pointers within it

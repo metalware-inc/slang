@@ -108,6 +108,7 @@ DiagnosticSeverity getDefaultSeverity(DiagCode code);
 
 SLANG_EXPORT std::ostream& operator<<(std::ostream& os, DiagCode code);
 SLANG_EXPORT std::string_view toString(DiagCode code);
+SLANG_EXPORT std::vector<DiagCode> fromString(std::string_view s);
 
 /// Wraps up a reported diagnostic along with location in source and any arguments.
 class SLANG_EXPORT Diagnostic {
@@ -191,6 +192,16 @@ public:
 
     /// Sorts the diagnostics in the collection based on source file and line number.
     void sort(const SourceManager& sourceManager);
+};
+
+/// A collection of diagnostics.
+class SLANG_EXPORT SuppressedDiagnostics : public SmallVector<DiagCode> {
+public:
+    /// Adds a new diagnostic to the collection, pointing to the given source location.
+    Diagnostic& add(DiagCode code, SourceLocation location);
+
+    /// Adds a new diagnostic to the collection, highlighting the given source range.
+    Diagnostic& add(DiagCode code, SourceRange range);
 };
 
 class SLANG_EXPORT DiagGroup {

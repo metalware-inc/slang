@@ -50,6 +50,8 @@ Compilation::Compilation(const Bag& options) :
     options(options.getOrDefault<CompilationOptions>()), driverMapAllocator(*this),
     unrollIntervalMapAllocator(*this), tempDiag({}, {}) {
 
+    this->options.flags |= CompilationFlags::LintMode; // Hacky way to set this
+
     // Construct all built-in types.
     bitType = emplace<ScalarType>(ScalarType::Bit);
     logicType = emplace<ScalarType>(ScalarType::Logic);
@@ -247,6 +249,7 @@ void Compilation::addSyntaxTree(std::shared_ptr<SyntaxTree> tree) {
 
     syntaxTrees.emplace_back(std::move(tree));
     cachedParseDiagnostics.reset();
+    cachedLineSuppressedDiagnostics.reset();
 }
 
 std::span<const std::shared_ptr<SyntaxTree>> Compilation::getSyntaxTrees() const {
@@ -1261,6 +1264,32 @@ CompilationUnitSymbol& Compilation::createScriptScope() {
     return *unit;
 }
 
+const Diagnostics& Compilation::getLineSuppressedDiagnostics() {
+    if (cachedLineSuppressedDiagnostics)
+        return *cachedLineSuppressedDiagnostics;
+
+    cachedLineSuppressedDiagnostics.emplace();
+    for (const auto& tree : syntaxTrees)
+        cachedLineSuppressedDiagnostics->append_range(tree->lineSuppressedDiagnostics());
+
+    if (sourceManager)
+        cachedLineSuppressedDiagnostics->sort(*sourceManager);
+    return *cachedLineSuppressedDiagnostics;
+}
+
+const Diagnostics& Compilation::getFileSuppressedDiagnostics() {
+    if (cachedFileSuppressedDiagnostics)
+        return *cachedFileSuppressedDiagnostics;
+
+    cachedFileSuppressedDiagnostics.emplace();
+    for (const auto& tree : syntaxTrees)
+        cachedFileSuppressedDiagnostics->append_range(tree->fileSuppressedDiagnostics());
+
+    if (sourceManager)
+        cachedFileSuppressedDiagnostics->sort(*sourceManager);
+    return *cachedFileSuppressedDiagnostics;
+}
+
 const Diagnostics& Compilation::getParseDiagnostics() {
     if (cachedParseDiagnostics)
         return *cachedParseDiagnostics;
@@ -1932,7 +1961,7 @@ void Compilation::checkElemTimeScale(std::optional<TimeScale> timeScale, SourceR
         }
     }
     else if (anyElemsWithTimescales) {
-        root->addDiag(diag::MissingTimeScale, sourceRange);
+        //root->addDiag(diag::MissingTimeScale, sourceRange);
     }
 }
 

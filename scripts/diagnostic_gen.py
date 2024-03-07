@@ -213,6 +213,15 @@ std::string_view toString(DiagCode code) {
     return "<user-diag>"sv;
 }
 
+std::vector<DiagCode> fromString(std::string_view s) {
+  std::vector<DiagCode> res;
+  for (auto [code, tup] : data) {
+    if (std::get<0>(tup) == s)
+      res.push_back(code);
+  }
+  return res;
+}
+
 std::string_view getDefaultMessage(DiagCode code) {
     if (auto it = data.find(code); it != data.end())
         return std::get<1>(it->second);

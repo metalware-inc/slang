@@ -64,7 +64,7 @@ public:
     /// @return the created and parsed syntax tree on success, or an OS error
     ///         code if the file fails to load.
     static TreeOrError fromFile(std::string_view path, SourceManager& sourceManager,
-                                const Bag& options = {});
+                                const Bag& options = {}, const SourceLibrary* lib = nullptr);
 
     /// Creates a syntax tree by concatenating several files loaded from disk.
     /// @a paths is the list of paths to the source files on disk.
@@ -79,7 +79,8 @@ public:
     /// @return the created and parsed syntax tree on success, or an OS error
     ///         code if the file fails to load.
     static TreeOrError fromFiles(std::span<const std::string_view> paths,
-                                 SourceManager& sourceManager, const Bag& options = {});
+                                 SourceManager& sourceManager, const Bag& options = {},
+                                 const SourceLibrary* lib = nullptr);
 
     /// Creates a syntax tree by guessing at what might be in the given source snippet.
     /// @a text is the actual source code text.
@@ -172,6 +173,10 @@ public:
     /// Gets any diagnostics generated while parsing.
     Diagnostics& diagnostics() { return diagnosticsBuffer; }
 
+    /// Gets any suppressed diagnostics generated while parsing.
+    Diagnostics& lineSuppressedDiagnostics() { return lineSuppressedDiagnosticsBuffer; }
+    Diagnostics& fileSuppressedDiagnostics() { return fileSuppressedDiagnosticsBuffer; }
+
     /// Gets the allocator containing the memory for the parse tree.
     BumpAllocator& allocator() { return alloc; }
 
@@ -214,7 +219,9 @@ public:
 private:
     SyntaxTree(SyntaxNode* root, const SourceLibrary* library, SourceManager& sourceManager,
                BumpAllocator&& alloc, Diagnostics&& diagnostics, parsing::ParserMetadata&& metadata,
-               std::vector<const DefineDirectiveSyntax*>&& macros, Bag options);
+               std::vector<const DefineDirectiveSyntax*>&& macros, Bag options,
+               Diagnostics&& lineSuppressedDiagnostics = Diagnostics(),
+               Diagnostics&& fileSuppressedDiagnostics = Diagnostics());
 
     static std::shared_ptr<SyntaxTree> create(SourceManager& sourceManager,
                                               std::span<const SourceBuffer> source,
@@ -226,6 +233,8 @@ private:
     SourceManager& sourceMan;
     BumpAllocator alloc;
     Diagnostics diagnosticsBuffer;
+    Diagnostics lineSuppressedDiagnosticsBuffer;
+    Diagnostics fileSuppressedDiagnosticsBuffer;
     Bag options_;
     std::unique_ptr<parsing::ParserMetadata> metadata;
     std::vector<const DefineDirectiveSyntax*> macros;
