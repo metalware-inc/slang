@@ -132,8 +132,7 @@ SLANG_BITMASK(CompilationFlags, AllowMultiDrivenLocals)
 /// Contains various options that can control compilation behavior.
 struct SLANG_EXPORT CompilationOptions {
     /// Various flags that control compilation behavior.
-    bitmask<CompilationFlags> flags = CompilationFlags::AllowTopLevelIfacePorts |
-                                      CompilationFlags::SuppressUnused;
+    bitmask<CompilationFlags> flags = CompilationFlags::AllowTopLevelIfacePorts;
 
     /// The maximum depth of nested module instances (and interfaces/programs),
     /// to detect infinite recursion.

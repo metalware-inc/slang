@@ -741,7 +741,7 @@ private:
 
     bool shouldWarn(const Symbol& symbol) {
         auto scope = symbol.getParentScope();
-        return !scope->isUninstantiated() && scope->asSymbol().kind != SymbolKind::Package &&
+        return /*!scope->isUninstantiated() &&*/scope->asSymbol().kind != SymbolKind::Package &&
                symbol.name != "_"sv && !hasUnusedAttrib(symbol);
     }
 
