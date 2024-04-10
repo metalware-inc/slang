@@ -8,11 +8,8 @@
 #pragma once
 
 #include <any>
-#include <typeindex>
-#include <typeinfo>
-
-#include "slang/util/Hash.h"
-#include "slang/util/TypeTraits.h"
+#include <unordered_map>
+#include <string>
 
 namespace slang {
 
@@ -26,51 +23,37 @@ class SLANG_EXPORT Bag {
 public:
     Bag() = default;
 
-    template<typename... T>
-    Bag(T&&... items) {
-        (set(std::forward<decltype(items)>(items)), ...);
+    template<typename... Args>
+    Bag(Args&&... items) {
+        (..., set(std::forward<Args>(items)));
     }
 
-    /// Returns true if there are no items in the bag.
-    [[nodiscard]] bool empty() const { return items.empty(); }
-
-    /// Adds or overwrites an existing element of type T in the bag
-    /// (making a copy in the process).
     template<typename T>
     void set(const T& item) {
-        items[SLANG_TYPEOF(T)] = item;
+        items[typeKey<T>()] = item;
     }
 
-    /// Adds or overwrites an existing element of type T in the bag
-    /// (moving in the new item in the process).
     template<typename T>
     void set(T&& item) {
-        items[SLANG_TYPEOF(T)] = std::forward<T>(item);
+        items[typeKey<T>()] = std::forward<T>(item);
     }
 
-    /// Gets an element of type T from the bag, if it exists.
-    /// Otherwise returns nullptr.
     template<typename T>
     const T* get() const {
-        auto it = items.find(SLANG_TYPEOF(T));
+        auto it = items.find(typeKey<T>());
         if (it == items.end())
             return nullptr;
         return std::any_cast<T>(&it->second);
     }
 
-    /// Gets an element of type T from the bag, if it exists.
-    /// Otherwise adds a default constructed element to the bag
-    /// and returns a reference to it.
     template<typename T>
     T& insertOrGet() {
-        auto& item = items[SLANG_TYPEOF(T)];
+        auto& item = items[typeKey<T>()];
         if (!item.has_value())
             item.template emplace<T>();
         return *std::any_cast<T>(&item);
     }
 
-    /// Gets an element of type T from the bag, if it exists.
-    /// Otherwise returns a default constructed T.
     template<typename T>
     T getOrDefault() const {
         const T* result = get<T>();
@@ -80,7 +63,13 @@ public:
     }
 
 private:
-    flat_hash_map<SLANG_TYPEINDEX, std::any> items;
+    std::unordered_map<std::string, std::any> items;
+
+    template<typename T>
+    std::string typeKey() const {
+        return typeid(T).name(); // or another unique string for each type
+    }
 };
 
 } // namespace slang
+
