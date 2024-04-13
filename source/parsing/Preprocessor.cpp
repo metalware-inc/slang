@@ -26,7 +26,7 @@ Preprocessor::Preprocessor(SourceManager& sourceManager, BumpAllocator& alloc,
                            Diagnostics& lineSuppressedDiagnostics, Diagnostics& fileSuppressedDiagnostics) :
     sourceManager(sourceManager),
     alloc(alloc), diagnostics(diagnostics), options(options_.getOrDefault<PreprocessorOptions>()),
-    lexerOptions(options_.getOrDefault<LexerOptions>()), numberParser(diagnostics, alloc, options.languageVersion), lineSuppressedDiagnostics(lineSuppressedDiagnostics), fileSuppressedDiagnostics(fileSuppressedDiagnostics) {
+    lexerOptions(options_.getOrDefault<LexerOptions>()), numberParser(diagnostics, alloc), lineSuppressedDiagnostics(lineSuppressedDiagnostics), fileSuppressedDiagnostics(fileSuppressedDiagnostics) {
 
     keywordVersionStack.push_back(LF::getDefaultKeywordVersion());
     resetAllDirectives();
@@ -79,7 +79,7 @@ Preprocessor::Preprocessor(SourceManager& sourceManager, BumpAllocator& alloc,
 
 Preprocessor::Preprocessor(const Preprocessor& other) :
     sourceManager(other.sourceManager), alloc(other.alloc), diagnostics(other.diagnostics),
-    numberParser(diagnostics, alloc, options.languageVersion), lineSuppressedDiagnostics(other.lineSuppressedDiagnostics),
+    numberParser(diagnostics, alloc), lineSuppressedDiagnostics(other.lineSuppressedDiagnostics),
     fileSuppressedDiagnostics(other.fileSuppressedDiagnostics) {
 
     keywordVersionStack.push_back(LF::getDefaultKeywordVersion());
