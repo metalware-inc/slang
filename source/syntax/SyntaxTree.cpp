@@ -37,7 +37,7 @@ SyntaxTree::TreeOrError SyntaxTree::fromFile(std::string_view path, SourceManage
                                              const Bag& options, const SourceLibrary* lib) {
     auto buffer = sourceManager.readSource(path, /* library */ lib);
     if (!buffer)
-        return nonstd::make_unexpected(std::pair{buffer.error(), path});
+        return nonstd::make_unexpected(std::pair{buffer.error(), nullptr});
     return create(sourceManager, std::span(&buffer.value(), 1), options, {}, false);
 }
 
@@ -50,7 +50,7 @@ SyntaxTree::TreeOrError SyntaxTree::fromFiles(std::span<const std::string_view> 
                                               const SourceLibrary* lib) {
     SmallVector<SourceBuffer, 4> buffers(paths.size(), UninitializedTag());
     for (auto path : paths) {
-        auto buffer = sourceManager.readSource(path, /* library */ lib);
+        auto buffer = sourceManager.readSource(path, /* library */ nullptr);
         if (!buffer)
             return nonstd::make_unexpected(std::pair{buffer.error(), path});
 
